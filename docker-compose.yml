@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pitstop-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pitstop
+      POSTGRES_PASSWORD: pitstop
+      POSTGRES_DB: pitstop
+    ports:
+      # Host port (default 5434) -> container 5432, to avoid clashing with a
+      # local Postgres. Override with DB_PORT in your environment if needed.
+      - "${DB_PORT:-5434}:5432"
+    volumes:
+      - pitstop-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pitstop -d pitstop"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pitstop-db-data:
