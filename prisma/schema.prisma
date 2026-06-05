@@ -1,0 +1,253 @@
+// PitStop backend data model.
+// Field names are chosen so the API serializers map cleanly onto the
+// contracts the mobile app already codes against.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MANAGER
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum BookingStatus {
+  BOOKED
+  ASSIGNED
+  CONDITION_PENDING
+  IN_PROGRESS
+  DONE_PENDING
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ConditionKind {
+  PICKUP
+  DELIVERY
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum Weekday {
+  mon
+  tue
+  wed
+  thu
+  fri
+  sat
+  sun
+}
+
+model Shop {
+  id          String   @id @default(cuid())
+  name        String
+  tagline     String?
+  logoUrl     String?
+  address     String?
+  lat         Float?
+  lng         Float?
+  timezone    String   @default("Asia/Kolkata")
+  rating      Float?
+  ratingCount Int?
+  createdAt   DateTime @default(now())
+
+  services     Service[]
+  memberships  Membership[]
+  bookings     Booking[]
+  workingHours WorkingHour[]
+}
+
+model WorkingHour {
+  id       String  @id @default(cuid())
+  shopId   String
+  day      Weekday
+  open     String // "HH:MM"
+  close    String // "HH:MM"
+  capacity Int
+  closed   Boolean @default(false)
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, day])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String?
+  email     String?
+  createdAt DateTime @default(now())
+
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  shopId    String
+  role      Role
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  vehicles         Vehicle[]
+  customerBookings Booking[] @relation("customer")
+  pickupBookings   Booking[] @relation("pickup")
+  serviceBookings  Booking[] @relation("service")
+
+  @@unique([userId, shopId, role])
+  @@index([shopId, role])
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  shopId      String
+  name        String
+  description String?
+  pricePaise  Int
+  durationMin Int
+  photoUrl    String?
+  active      Boolean  @default(true)
+  icon        String?
+  createdAt   DateTime @default(now())
+
+  shop     Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([shopId])
+}
+
+model Vehicle {
+  id           String   @id @default(cuid())
+  membershipId String
+  makeModel    String
+  plate        String?
+  color        String?
+  createdAt    DateTime @default(now())
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  bookings   Booking[]
+
+  @@index([membershipId])
+}
+
+model Booking {
+  id                   String        @id @default(cuid())
+  shopId               String
+  customerMembershipId String
+  serviceId            String
+  vehicleId            String?
+  status               BookingStatus @default(BOOKED)
+  scheduledAt          DateTime
+  durationMin          Int
+  pricePaise           Int
+  notes                String?
+  pickupMembershipId   String?
+  serviceMembershipId  String?
+  createdAt            DateTime      @default(now())
+
+  shop            Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  customer        Membership  @relation("customer", fields: [customerMembershipId], references: [id])
+  service         Service     @relation(fields: [serviceId], references: [id])
+  vehicle         Vehicle?    @relation(fields: [vehicleId], references: [id])
+  pickupEmployee  Membership? @relation("pickup", fields: [pickupMembershipId], references: [id])
+  serviceEmployee Membership? @relation("service", fields: [serviceMembershipId], references: [id])
+
+  conditionReports ConditionReport[]
+  checklist        ChecklistItem[]
+  payment          Payment?
+
+  @@index([shopId])
+  @@index([customerMembershipId])
+  @@index([pickupMembershipId])
+  @@index([serviceMembershipId])
+  @@index([scheduledAt])
+}
+
+model ChecklistItem {
+  id        String    @id @default(cuid())
+  bookingId String
+  label     String
+  position  Int
+  done      Boolean   @default(false)
+  doneAt    DateTime?
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+}
+
+model ConditionReport {
+  id                 String        @id @default(cuid())
+  bookingId          String
+  kind               ConditionKind
+  customerVerifiedAt DateTime?
+  createdAt          DateTime      @default(now())
+
+  booking Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  photos  ConditionPhoto[]
+
+  @@index([bookingId])
+}
+
+model ConditionPhoto {
+  id        String   @id @default(cuid())
+  reportId  String
+  url       String
+  caption   String?
+  createdAt DateTime @default(now())
+
+  report ConditionReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  bookingId   String        @unique
+  amountPaise Int
+  gateway     String        @default("razorpay")
+  status      PaymentStatus @default(CREATED)
+  createdAt   DateTime      @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model OtpChallenge {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
