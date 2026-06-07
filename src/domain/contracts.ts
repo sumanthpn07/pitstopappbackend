@@ -35,6 +35,7 @@ export interface ServiceDTO {
   photoUrl: string | null;
   active: boolean;
   icon?: string;
+  category?: string;
 }
 
 export interface VehicleDTO {
@@ -42,6 +43,8 @@ export interface VehicleDTO {
   makeModel: string;
   plate: string | null;
   color: string | null;
+  /** "Car" | "Bike" — drives the finance bikes-vs-cars split. */
+  type: string | null;
 }
 
 export interface ChecklistItemDTO {
@@ -143,4 +146,23 @@ export interface TokensDTO {
 export interface OtpRequestResultDTO {
   expiresInSeconds: number;
   devCode?: string;
+}
+
+export interface OfferDTO {
+  id: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  photoUrl: string | null;
+}
+
+export type TxnType = 'income' | 'expense';
+
+export interface FinanceTxnDTO {
+  id: string;
+  type: TxnType;
+  category: string;
+  note: string | null;
+  amountPaise: number;
+  date: string;
 }

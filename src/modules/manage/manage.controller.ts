@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -8,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CurrentUser, Roles } from '../../common/decorators';
@@ -15,6 +17,9 @@ import type { AuthContext } from '../../common/auth.types';
 import { ManageService } from './manage.service';
 import {
   AssignStaffDto,
+  CreateEmployeeDto,
+  CreateExpenseDto,
+  CreateOfferDto,
   CreateServiceDto,
   SetWorkingHoursDto,
   UpdateServiceDto,
@@ -38,6 +43,49 @@ export class ManageController {
   @Get('staff')
   staff(@CurrentUser() auth: AuthContext) {
     return this.manage.staff(auth);
+  }
+
+  @Post('staff')
+  createEmployee(@CurrentUser() auth: AuthContext, @Body() dto: CreateEmployeeDto) {
+    return this.manage.createEmployee(auth, dto);
+  }
+
+  @Delete('staff/:membershipId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeEmployee(@CurrentUser() auth: AuthContext, @Param('membershipId') membershipId: string) {
+    return this.manage.removeEmployee(auth, membershipId);
+  }
+
+  @Get('vehicles')
+  searchVehicles(@CurrentUser() auth: AuthContext, @Query('q') q: string) {
+    return this.manage.searchVehicles(auth, q ?? '');
+  }
+
+  @Post('offers')
+  createOffer(@CurrentUser() auth: AuthContext, @Body() dto: CreateOfferDto) {
+    return this.manage.createOffer(auth, dto);
+  }
+
+  @Delete('offers/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteOffer(@CurrentUser() auth: AuthContext, @Param('id') id: string) {
+    return this.manage.deleteOffer(auth, id);
+  }
+
+  @Get('finance')
+  finance(@CurrentUser() auth: AuthContext) {
+    return this.manage.getFinance(auth);
+  }
+
+  @Post('finance/expenses')
+  createExpense(@CurrentUser() auth: AuthContext, @Body() dto: CreateExpenseDto) {
+    return this.manage.createExpense(auth, dto);
+  }
+
+  @Delete('finance/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteTransaction(@CurrentUser() auth: AuthContext, @Param('id') id: string) {
+    return this.manage.deleteTransaction(auth, id);
   }
 
   @Post('bookings/:bookingId/assign')

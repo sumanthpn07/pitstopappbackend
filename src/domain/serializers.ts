@@ -2,6 +2,8 @@ import {
   Prisma,
   type ChecklistItem,
   type ConditionPhoto,
+  type FinanceTxn,
+  type Offer,
   type Payment,
   type Service,
   type Shop,
@@ -14,8 +16,10 @@ import type {
   ChecklistItemDTO,
   ConditionPhotoDTO,
   ConditionReportDTO,
+  FinanceTxnDTO,
   MeDTO,
   MembershipDTO,
+  OfferDTO,
   PaymentDTO,
   ServiceDTO,
   ShopDTO,
@@ -79,6 +83,7 @@ export function serializeService(s: Service): ServiceDTO {
     photoUrl: s.photoUrl ?? null,
     active: s.active,
     ...(s.icon ? { icon: s.icon } : {}),
+    ...(s.category ? { category: s.category } : {}),
   };
 }
 
@@ -88,6 +93,28 @@ export function serializeVehicle(v: Vehicle): VehicleDTO {
     makeModel: v.makeModel,
     plate: v.plate ?? null,
     color: v.color ?? null,
+    type: v.type ?? null,
+  };
+}
+
+export function serializeOffer(o: Offer): OfferDTO {
+  return {
+    id: o.id,
+    title: o.title,
+    subtitle: o.subtitle,
+    badge: o.badge,
+    photoUrl: o.photoUrl ?? null,
+  };
+}
+
+export function serializeFinanceTxn(t: FinanceTxn): FinanceTxnDTO {
+  return {
+    id: t.id,
+    type: t.type,
+    category: t.category,
+    note: t.note ?? null,
+    amountPaise: t.amountPaise,
+    date: t.date.toISOString(),
   };
 }
 

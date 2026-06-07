@@ -34,8 +34,15 @@ export class VehiclesService {
         makeModel: dto.makeModel.trim(),
         plate: dto.plate?.trim() || null,
         color: dto.color?.trim() || null,
+        type: dto.type?.trim() || null,
       },
     });
     return serializeVehicle(vehicle);
+  }
+
+  async remove(auth: AuthContext, id: string): Promise<void> {
+    const m = this.customerMembership(auth);
+    // Scope the delete to the signed-in customer's own vehicles.
+    await this.prisma.vehicle.deleteMany({ where: { id, membershipId: m.id } });
   }
 }

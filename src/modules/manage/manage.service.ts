@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BookingStatus, Role, Weekday } from '@prisma/client';
+import { BookingStatus, Role, TxnType, Weekday } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ApiException } from '../../common/api-exception';
 import { membershipForRole, type AuthContext, type AuthMembership } from '../../common/auth.types';
@@ -7,23 +7,35 @@ import { TERMINAL_STATUSES } from '../../domain/status';
 import {
   bookingInclude,
   serializeBooking,
+  serializeFinanceTxn,
+  serializeOffer,
   serializeService,
   serializeStaff,
   workingHoursToDto,
 } from '../../domain/serializers';
 import type {
   BookingDTO,
+  FinanceTxnDTO,
+  OfferDTO,
   ServiceDTO,
   StaffMemberDTO,
   WorkingHoursDTO,
 } from '../../domain/contracts';
 import type {
   AssignStaffDto,
+  CreateEmployeeDto,
+  CreateExpenseDto,
+  CreateOfferDto,
   CreateServiceDto,
   DayHoursDto,
   SetWorkingHoursDto,
   UpdateServiceDto,
 } from './dto';
+
+/** Strip whitespace + lowercase so plate lookups ignore spacing/case. */
+function normalizePlate(value: string): string {
+  return value.replace(/\s+/g, '').toLowerCase();
+}
 
 @Injectable()
 export class ManageService {
@@ -131,6 +143,7 @@ export class ManageService {
         durationMin: dto.durationMin,
         photoUrl: dto.photoUrl?.trim() || null,
         icon: dto.icon?.trim() || 'sparkles',
+        category: dto.category?.trim() || null,
         active: true,
       },
     });
@@ -197,5 +210,113 @@ export class ManageService {
     );
     const rows = await this.prisma.workingHour.findMany({ where: { shopId: m.shopId } });
     return workingHoursToDto(rows);
+  }
+
+  // ---- Staff management ----
+
+  async createEmployee(auth: AuthContext, dto: CreateEmployeeDto): Promise<StaffMemberDTO> {
+    const m = this.manager(auth);
+    const phone = dto.phone.trim();
+    const existing = await this.prisma.user.findUnique({ where: { phone } });
+    if (existing) throw ApiException.validation('That phone number is already in use.');
+
+    const user = await this.prisma.user.create({
+      data: {
+        phone,
+        name: dto.name.trim(),
+        memberships: { create: { shopId: m.shopId, role: Role.EMPLOYEE } },
+      },
+    });
+    const membership = await this.prisma.membership.findFirstOrThrow({
+      where: { userId: user.id, shopId: m.shopId, role: Role.EMPLOYEE },
+      include: { user: true },
+    });
+    return serializeStaff(membership, 0);
+  }
+
+  async removeEmployee(auth: AuthContext, membershipId: string): Promise<void> {
+    const m = this.manager(auth);
+    const emp = await this.prisma.membership.findFirst({
+      where: { id: membershipId, shopId: m.shopId, role: Role.EMPLOYEE },
+    });
+    if (!emp) return;
+
+    // Unassign from every booking, then remove the membership and revoke login.
+    await this.prisma.$transaction([
+      this.prisma.booking.updateMany({ where: { pickupMembershipId: membershipId }, data: { pickupMembershipId: null } }),
+      this.prisma.booking.updateMany({ where: { serviceMembershipId: membershipId }, data: { serviceMembershipId: null } }),
+      this.prisma.membership.delete({ where: { id: membershipId } }),
+    ]);
+
+    const remaining = await this.prisma.membership.count({ where: { userId: emp.userId } });
+    if (remaining === 0) await this.prisma.user.delete({ where: { id: emp.userId } });
+  }
+
+  // ---- Vehicle search (by plate) ----
+
+  async searchVehicles(auth: AuthContext, query: string): Promise<BookingDTO[]> {
+    const m = this.manager(auth);
+    const q = normalizePlate(query ?? '');
+    if (q.length < 2) return [];
+    const rows = await this.prisma.booking.findMany({
+      where: { shopId: m.shopId, vehicleId: { not: null } },
+      include: bookingInclude,
+      orderBy: { scheduledAt: 'desc' },
+    });
+    return rows
+      .filter((b) => b.vehicle?.plate && normalizePlate(b.vehicle.plate).includes(q))
+      .map(serializeBooking);
+  }
+
+  // ---- Offers ----
+
+  async createOffer(auth: AuthContext, dto: CreateOfferDto): Promise<OfferDTO> {
+    const m = this.manager(auth);
+    const offer = await this.prisma.offer.create({
+      data: {
+        shopId: m.shopId,
+        title: dto.title.trim(),
+        subtitle: dto.subtitle.trim(),
+        badge: dto.badge.trim(),
+        photoUrl: dto.photoUrl?.trim() || null,
+      },
+    });
+    return serializeOffer(offer);
+  }
+
+  async deleteOffer(auth: AuthContext, id: string): Promise<void> {
+    const m = this.manager(auth);
+    await this.prisma.offer.deleteMany({ where: { id, shopId: m.shopId } });
+  }
+
+  // ---- Finance ----
+
+  async getFinance(auth: AuthContext): Promise<FinanceTxnDTO[]> {
+    const m = this.manager(auth);
+    const rows = await this.prisma.financeTxn.findMany({
+      where: { shopId: m.shopId },
+      orderBy: { date: 'desc' },
+    });
+    return rows.map(serializeFinanceTxn);
+  }
+
+  async createExpense(auth: AuthContext, dto: CreateExpenseDto): Promise<FinanceTxnDTO> {
+    const m = this.manager(auth);
+    const tx = await this.prisma.financeTxn.create({
+      data: {
+        shopId: m.shopId,
+        type: (dto.type ?? 'expense') as TxnType,
+        category: dto.category.trim(),
+        note: dto.note?.trim() || null,
+        amountPaise: dto.amountPaise,
+        date: dto.date ? new Date(dto.date) : new Date(),
+      },
+    });
+    return serializeFinanceTxn(tx);
+  }
+
+  async deleteTransaction(auth: AuthContext, id: string): Promise<void> {
+    const m = this.manager(auth);
+    await this.prisma.financeTxn.deleteMany({ where: { id, shopId: m.shopId } });
   }
 }

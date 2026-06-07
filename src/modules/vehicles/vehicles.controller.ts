@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CurrentUser, Roles } from '../../common/decorators';
 import type { AuthContext } from '../../common/auth.types';
@@ -18,5 +18,11 @@ export class VehiclesController {
   @Post()
   create(@CurrentUser() auth: AuthContext, @Body() dto: CreateVehicleDto) {
     return this.vehicles.create(auth, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@CurrentUser() auth: AuthContext, @Param('id') id: string) {
+    return this.vehicles.remove(auth, id);
   }
 }

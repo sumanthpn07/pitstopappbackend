@@ -73,10 +73,13 @@ All errors are returned as `{ "error": { "code", "message" } }`. Auth is `Author
 | `POST /auth/otp/verify` | public | Verify OTP → `{ accessToken, refreshToken, expiresIn }` |
 | `POST /auth/refresh` | public | Rotate a refresh token |
 | `GET /me` | any | Current user + memberships |
+| `PATCH /me` | any | Update own name / email (onboarding) |
 | `GET /shop` | public | Shop profile |
 | `GET /services` | public | Active services |
+| `GET /offers` | public | Promotional offers |
 | `GET /availability?serviceId=&date=` | public | Bookable slots for a day |
-| `GET /vehicles` · `POST /vehicles` | customer | List / add vehicles |
+| `GET /vehicles` · `POST /vehicles` | customer | List / add vehicles (incl. `type`) |
+| `DELETE /vehicles/:id` | customer | Remove a vehicle |
 | `GET /bookings` · `POST /bookings` | customer | List / create bookings |
 | `GET /bookings/:id` | owner or staff | Booking detail |
 | `POST /bookings/:id/cancel` | customer | Cancel a booking |
@@ -84,8 +87,14 @@ All errors are returned as `{ "error": { "code", "message" } }`. Auth is `Author
 | `GET /manage/bookings` | manager | All shop bookings |
 | `GET /manage/services` | manager | All services (incl. hidden) |
 | `GET /manage/staff` | manager | Employees + task load |
+| `POST /manage/staff` · `DELETE /manage/staff/:membershipId` | manager | Add / remove an employee |
+| `GET /manage/vehicles?q=` | manager | Search bookings by number plate |
 | `POST /manage/bookings/:id/assign` | manager | Assign pickup / service staff |
 | `POST /manage/services` · `PATCH /manage/services/:id` | manager | Create / edit services |
+| `POST /manage/offers` · `DELETE /manage/offers/:id` | manager | Add / remove an offer |
+| `GET /manage/finance` | manager | Income & expense ledger |
+| `POST /manage/finance/expenses` | manager | Record an expense or income |
+| `DELETE /manage/finance/:id` | manager | Delete a transaction |
 | `GET /manage/working-hours` · `PUT /manage/working-hours` | manager | Read / set hours |
 | `GET /tasks` | employee | Assigned tasks |
 | `POST /tasks/:id/condition-reports` | employee | Submit pickup/delivery photos |

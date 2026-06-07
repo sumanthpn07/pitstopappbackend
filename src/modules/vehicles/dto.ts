@@ -12,4 +12,8 @@ export class CreateVehicleDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
 }

@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -48,6 +49,10 @@ export class CreateServiceDto {
   @IsOptional()
   @IsString()
   icon?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 }
 
 export class UpdateServiceDto {
@@ -106,4 +111,55 @@ export class SetWorkingHoursDto {
   @ValidateNested() @Type(() => DayHoursDto) fri!: DayHoursDto;
   @ValidateNested() @Type(() => DayHoursDto) sat!: DayHoursDto;
   @ValidateNested() @Type(() => DayHoursDto) sun!: DayHoursDto;
+}
+
+export class CreateEmployeeDto {
+  @IsString()
+  @MinLength(1)
+  name!: string;
+
+  @IsString()
+  @MinLength(6)
+  phone!: string;
+}
+
+export class CreateOfferDto {
+  @IsString()
+  @MinLength(1)
+  title!: string;
+
+  @IsString()
+  @MinLength(1)
+  subtitle!: string;
+
+  @IsString()
+  @MinLength(1)
+  badge!: string;
+
+  @IsOptional()
+  @IsString()
+  photoUrl?: string;
+}
+
+export class CreateExpenseDto {
+  // Defaults to "expense"; pass "income" to record takings.
+  @IsOptional()
+  @IsIn(['income', 'expense'])
+  type?: 'income' | 'expense';
+
+  @IsString()
+  @MinLength(1)
+  category!: string;
+
+  @IsInt()
+  @Min(0)
+  amountPaise!: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsString()
+  date?: string;
 }

@@ -5,8 +5,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ApiException } from '../../common/api-exception';
 import { computeSlots } from '../../domain/availability';
 import { endOfDayUtc, isValidDateKey, startOfDayUtc, weekdayOf } from '../../domain/datetime';
-import { serializeService, serializeShop } from '../../domain/serializers';
-import type { AvailabilitySlotDTO, ServiceDTO, ShopDTO } from '../../domain/contracts';
+import { serializeOffer, serializeService, serializeShop } from '../../domain/serializers';
+import type { AvailabilitySlotDTO, OfferDTO, ServiceDTO, ShopDTO } from '../../domain/contracts';
 
 @Injectable()
 export class CatalogService {
@@ -35,6 +35,15 @@ export class CatalogService {
       orderBy: { createdAt: 'asc' },
     });
     return rows.map(serializeService);
+  }
+
+  async getOffers(): Promise<OfferDTO[]> {
+    const shop = await this.resolveShop();
+    const rows = await this.prisma.offer.findMany({
+      where: { shopId: shop.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map(serializeOffer);
   }
 
   async getAvailability(serviceId: string, dateKey: string): Promise<AvailabilitySlotDTO[]> {
