@@ -4,6 +4,7 @@ import {
   PaymentStatus,
   PrismaClient,
   Role,
+  TxnType,
   Weekday,
 } from '@prisma/client';
 import { DateTime } from 'luxon';
@@ -25,12 +26,12 @@ function at(dateKey: string, hhmm: string): Date {
 }
 
 const SERVICES = [
-  { id: 'svc_wash', name: 'Express Exterior Wash', description: 'A quick, thorough hand wash — wheels, body and glass. In and out in under an hour.', pricePaise: 49900, durationMin: 45, photo: photo('1520340356584-f9917d1eea6f'), icon: 'water' },
-  { id: 'svc_foam', name: 'Premium Foam Wash & Wax', description: 'Snow-foam pre-soak, pH-neutral wash, hand dry and a carnauba wax for deep gloss.', pricePaise: 129900, durationMin: 90, photo: photo('1607860108855-64acf2078ed9'), icon: 'sparkles' },
-  { id: 'svc_interior', name: 'Interior Deep Clean', description: 'Full vacuum, steam-clean of seats and mats, dashboard conditioning and odour removal.', pricePaise: 179900, durationMin: 120, photo: photo('1605437241278-c1806d14a4d9'), icon: 'car-sport' },
-  { id: 'svc_full', name: 'Full Detailing — In & Out', description: 'The works: exterior foam wash, paint decontamination, interior deep clean and dressing.', pricePaise: 349900, durationMin: 240, photo: photo('1633014041037-f5446fb4ce99'), icon: 'brush' },
-  { id: 'svc_ceramic', name: 'Ceramic Coating 9H', description: 'Multi-stage paint correction followed by a 9H ceramic coat. Years of gloss and protection.', pricePaise: 1499900, durationMin: 480, photo: photo('1622329821376-a19fd6002562'), icon: 'shield-checkmark' },
-  { id: 'svc_headlight', name: 'Headlight Restoration', description: 'Sand, polish and seal cloudy headlights back to crystal clarity.', pricePaise: 89900, durationMin: 60, photo: photo('1556448851-9359658faa54'), icon: 'bulb' },
+  { id: 'svc_wash', name: 'Express Exterior Wash', description: 'A quick, thorough hand wash — wheels, body and glass. In and out in under an hour.', pricePaise: 49900, durationMin: 45, photo: photo('1520340356584-f9917d1eea6f'), icon: 'water', category: 'Wash' },
+  { id: 'svc_foam', name: 'Premium Foam Wash & Wax', description: 'Snow-foam pre-soak, pH-neutral wash, hand dry and a carnauba wax for deep gloss.', pricePaise: 129900, durationMin: 90, photo: photo('1607860108855-64acf2078ed9'), icon: 'sparkles', category: 'Wash' },
+  { id: 'svc_interior', name: 'Interior Deep Clean', description: 'Full vacuum, steam-clean of seats and mats, dashboard conditioning and odour removal.', pricePaise: 179900, durationMin: 120, photo: photo('1605437241278-c1806d14a4d9'), icon: 'car-sport', category: 'Detail' },
+  { id: 'svc_full', name: 'Full Detailing — In & Out', description: 'The works: exterior foam wash, paint decontamination, interior deep clean and dressing.', pricePaise: 349900, durationMin: 240, photo: photo('1633014041037-f5446fb4ce99'), icon: 'brush', category: 'Detail' },
+  { id: 'svc_ceramic', name: 'Ceramic Coating 9H', description: 'Multi-stage paint correction followed by a 9H ceramic coat. Years of gloss and protection.', pricePaise: 1499900, durationMin: 480, photo: photo('1622329821376-a19fd6002562'), icon: 'shield-checkmark', category: 'Protect' },
+  { id: 'svc_headlight', name: 'Headlight Restoration', description: 'Sand, polish and seal cloudy headlights back to crystal clarity.', pricePaise: 89900, durationMin: 60, photo: photo('1556448851-9359658faa54'), icon: 'bulb', category: 'Detail' },
 ];
 const SERVICE_BY_ID = Object.fromEntries(SERVICES.map((s) => [s.id, s]));
 
@@ -105,8 +106,8 @@ async function main(): Promise<void> {
   for (const s of SERVICES) {
     await prisma.service.upsert({
       where: { id: s.id },
-      update: { name: s.name, description: s.description, pricePaise: s.pricePaise, durationMin: s.durationMin, photoUrl: s.photo, icon: s.icon, active: true },
-      create: { id: s.id, shopId: SHOP_ID, name: s.name, description: s.description, pricePaise: s.pricePaise, durationMin: s.durationMin, photoUrl: s.photo, icon: s.icon, active: true },
+      update: { name: s.name, description: s.description, pricePaise: s.pricePaise, durationMin: s.durationMin, photoUrl: s.photo, icon: s.icon, category: s.category, active: true },
+      create: { id: s.id, shopId: SHOP_ID, name: s.name, description: s.description, pricePaise: s.pricePaise, durationMin: s.durationMin, photoUrl: s.photo, icon: s.icon, category: s.category, active: true },
     });
   }
 
@@ -137,13 +138,18 @@ async function main(): Promise<void> {
   });
   await prisma.vehicle.upsert({
     where: { id: 'veh_demo_swift' },
-    update: {},
-    create: { id: 'veh_demo_swift', membershipId: DEMO_CUSTOMER.membershipId, makeModel: 'Maruti Swift', plate: 'KA 01 AB 1234', color: 'Pearl White' },
+    update: { type: 'Car' },
+    create: { id: 'veh_demo_swift', membershipId: DEMO_CUSTOMER.membershipId, makeModel: 'Maruti Swift', plate: 'KA 01 AB 1234', color: 'Pearl White', type: 'Car' },
   });
   await prisma.vehicle.upsert({
     where: { id: 'veh_demo_creta' },
-    update: {},
-    create: { id: 'veh_demo_creta', membershipId: DEMO_CUSTOMER.membershipId, makeModel: 'Hyundai Creta', plate: 'KA 05 MJ 9090', color: 'Midnight Blue' },
+    update: { type: 'Car' },
+    create: { id: 'veh_demo_creta', membershipId: DEMO_CUSTOMER.membershipId, makeModel: 'Hyundai Creta', plate: 'KA 05 MJ 9090', color: 'Midnight Blue', type: 'Car' },
+  });
+  await prisma.vehicle.upsert({
+    where: { id: 'veh_demo_classic' },
+    update: { type: 'Bike' },
+    create: { id: 'veh_demo_classic', membershipId: DEMO_CUSTOMER.membershipId, makeModel: 'Royal Enfield Classic 350', plate: 'KA 03 HG 4521', color: 'Jet Black', type: 'Bike' },
   });
 
   // Reset and reseed the demo customer's bookings (idempotent).
@@ -221,8 +227,63 @@ async function main(): Promise<void> {
     },
   });
 
+  // 6) Completed bike service — feeds the finance bikes-vs-cars split.
+  await prisma.booking.create({
+    data: {
+      shopId: SHOP_ID, customerMembershipId: DEMO_CUSTOMER.membershipId, vehicleId: 'veh_demo_classic',
+      status: BookingStatus.COMPLETED, scheduledAt: at(pastKey, '09:30'), ...base('svc_wash'),
+      pickupMembershipId: PRIYA, serviceMembershipId: PRIYA,
+      checklist: { create: checklistCreate('svc_wash', 99) },
+      conditionReports: {
+        create: [
+          reportCreate(ConditionKind.PICKUP, true, ['bike-a']),
+          reportCreate(ConditionKind.DELIVERY, true, ['bike-b']),
+        ],
+      },
+      payment: { create: { amountPaise: base('svc_wash').pricePaise, gateway: 'razorpay', status: PaymentStatus.CAPTURED } },
+    },
+  });
+
+  // Offers (idempotent reset)
+  await prisma.offer.deleteMany({ where: { shopId: SHOP_ID } });
+  await prisma.offer.createMany({
+    data: [
+      { shopId: SHOP_ID, title: 'Monsoon Shine', subtitle: '20% off any Foam Wash & Wax', badge: '20% OFF', photoUrl: photo('1607860108855-64acf2078ed9') },
+      { shopId: SHOP_ID, title: 'Weekday Detail', subtitle: '₹500 off Full Detailing, Mon–Thu', badge: '₹500 OFF', photoUrl: photo('1633014041037-f5446fb4ce99') },
+      { shopId: SHOP_ID, title: 'Ceramic Season', subtitle: 'Free headlight restore with 9H coating', badge: 'FREE ADD-ON', photoUrl: photo('1622329821376-a19fd6002562') },
+    ],
+  });
+
+  // Finance ledger — ~6 months of income & expenses (idempotent reset)
+  await prisma.financeTxn.deleteMany({ where: { shopId: SHOP_ID } });
+  const finance: {
+    type: TxnType;
+    category: string;
+    note: string | null;
+    amountPaise: number;
+    date: Date;
+  }[] = [];
+  const addTxn = (monthsAgo: number, day: number, type: TxnType, category: string, rupees: number, note: string | null) => {
+    const date = DateTime.now().setZone(ZONE).minus({ months: monthsAgo }).set({ day, hour: 12, minute: 0, second: 0 }).toJSDate();
+    finance.push({ type, category, note, amountPaise: Math.round(rupees) * 100, date });
+  };
+  for (let m = 5; m >= 0; m--) {
+    addTxn(m, 5, TxnType.income, 'Wash & detailing', 48000 + ((m * 7) % 20) * 1000, 'Weekly takings');
+    addTxn(m, 12, TxnType.income, 'Wash & detailing', 52000 + ((m * 11) % 18) * 1000, 'Weekly takings');
+    addTxn(m, 19, TxnType.income, 'Ceramic & protection', 36000 + ((m * 5) % 15) * 1000, null);
+    addTxn(m, 26, TxnType.income, 'Memberships', 18000, 'Monthly plans');
+    addTxn(m, 1, TxnType.expense, 'Rent', 60000, 'Shop rent');
+    addTxn(m, 2, TxnType.expense, 'Salaries', 120000, 'Team payroll');
+    addTxn(m, 8, TxnType.expense, 'Supplies', 14000 + ((m * 3) % 10) * 1000, 'Chemicals & consumables');
+    addTxn(m, 10, TxnType.expense, 'Inventory', 6000 + ((m * 6) % 9) * 1000, 'Pressure pump, foam soap & wax');
+    addTxn(m, 15, TxnType.expense, 'Utilities', 9000 + ((m * 2) % 6) * 1000, 'Water & power');
+    addTxn(m, 20, TxnType.expense, 'Marketing', 8000 + ((m * 4) % 8) * 1000, 'Ads & promos');
+    if (m % 2 === 0) addTxn(m, 22, TxnType.expense, 'Equipment', 22000, 'Tools & machines');
+  }
+  await prisma.financeTxn.createMany({ data: finance.map((f) => ({ shopId: SHOP_ID, ...f })) });
+
   // eslint-disable-next-line no-console
-  console.log('Seed complete: shop, working hours, 6 services, 3 staff, 1 demo customer, 5 bookings.');
+  console.log('Seed complete: shop, working hours, 6 services, 3 staff, 1 demo customer, 6 bookings, 3 offers, finance ledger.');
 }
 
 main()

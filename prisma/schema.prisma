@@ -51,6 +51,11 @@ enum Weekday {
   sun
 }
 
+enum TxnType {
+  income
+  expense
+}
+
 model Shop {
   id          String   @id @default(cuid())
   name        String
@@ -68,6 +73,8 @@ model Shop {
   memberships  Membership[]
   bookings     Booking[]
   workingHours WorkingHour[]
+  offers       Offer[]
+  finances     FinanceTxn[]
 }
 
 model WorkingHour {
@@ -124,6 +131,7 @@ model Service {
   photoUrl    String?
   active      Boolean  @default(true)
   icon        String?
+  category    String?
   createdAt   DateTime @default(now())
 
   shop     Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
@@ -138,6 +146,7 @@ model Vehicle {
   makeModel    String
   plate        String?
   color        String?
+  type         String?
   createdAt    DateTime @default(now())
 
   membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
@@ -250,4 +259,33 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Offer {
+  id        String   @id @default(cuid())
+  shopId    String
+  title     String
+  subtitle  String
+  badge     String
+  photoUrl  String?
+  createdAt DateTime @default(now())
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+}
+
+model FinanceTxn {
+  id          String   @id @default(cuid())
+  shopId      String
+  type        TxnType
+  category    String
+  note        String?
+  amountPaise Int
+  date        DateTime
+  createdAt   DateTime @default(now())
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
 }
