@@ -5,6 +5,7 @@ import {
   type FinanceTxn,
   type Offer,
   type Payment,
+  type PickupTripPoint,
   type Service,
   type Shop,
   type Vehicle,
@@ -21,6 +22,9 @@ import type {
   MembershipDTO,
   OfferDTO,
   PaymentDTO,
+  PickupAddressDTO,
+  PickupTripDTO,
+  PickupTripPointDTO,
   ServiceDTO,
   ShopDTO,
   StaffMemberDTO,
@@ -43,11 +47,15 @@ export const bookingInclude = {
   },
   checklist: { orderBy: { position: 'asc' } },
   payment: true,
+  pickupTrip: {
+    include: { points: { orderBy: { recordedAt: 'asc' } } },
+  },
 } satisfies Prisma.BookingInclude;
 
 export type BookingWithRelations = Prisma.BookingGetPayload<{ include: typeof bookingInclude }>;
 type MembershipWithUser = Prisma.MembershipGetPayload<{ include: { user: true } }>;
 type ReportWithPhotos = Prisma.ConditionReportGetPayload<{ include: { photos: true } }>;
+type TripWithPoints = Prisma.PickupTripGetPayload<{ include: { points: true } }>;
 type UserWithMemberships = Prisma.UserGetPayload<{
   include: { memberships: { include: { shop: true } } };
 }>;
@@ -157,6 +165,47 @@ function serializePayment(p: Payment): PaymentDTO {
   };
 }
 
+function serializeTripPoint(p: PickupTripPoint): PickupTripPointDTO {
+  return {
+    id: p.id,
+    lat: p.lat,
+    lng: p.lng,
+    speed: p.speed ?? null,
+    heading: p.heading ?? null,
+    accuracy: p.accuracy ?? null,
+    recordedAt: p.recordedAt.toISOString(),
+  };
+}
+
+export function serializePickupTrip(trip: TripWithPoints): PickupTripDTO {
+  const path = trip.points.map(serializeTripPoint);
+  return {
+    id: trip.id,
+    bookingId: trip.bookingId,
+    employeeMembershipId: trip.employeeMembershipId ?? null,
+    status: trip.status,
+    startedAt: trip.startedAt ? trip.startedAt.toISOString() : null,
+    reachedGarageAt: trip.reachedGarageAt ? trip.reachedGarageAt.toISOString() : null,
+    lastEtaMin: trip.lastEtaMin ?? null,
+    lastLocation: path.length ? path[path.length - 1] : null,
+    path,
+  };
+}
+
+function serializePickupAddress(b: BookingWithRelations): PickupAddressDTO | null {
+  if (!b.pickupAddress || b.pickupLat === null || b.pickupLng === null) return null;
+  return {
+    fullAddress: b.pickupAddress,
+    landmark: b.pickupLandmark ?? null,
+    city: b.pickupCity ?? null,
+    lat: b.pickupLat,
+    lng: b.pickupLng,
+    contactName: b.pickupContactName ?? null,
+    contactPhone: b.pickupContactPhone ?? null,
+    notes: b.pickupNotes ?? null,
+  };
+}
+
 export function serializeBooking(b: BookingWithRelations): BookingDTO {
   const serviceEmployee = partyOf(b.serviceEmployee);
   return {
@@ -173,6 +222,8 @@ export function serializeBooking(b: BookingWithRelations): BookingDTO {
     employee: serviceEmployee,
     pickupEmployee: partyOf(b.pickupEmployee),
     serviceEmployee,
+    pickupAddress: serializePickupAddress(b),
+    pickupTrip: b.pickupTrip ? serializePickupTrip(b.pickupTrip) : null,
     conditionReports: b.conditionReports.map(serializeReport),
     checklist: b.checklist.map(serializeChecklistItem),
     payment: b.payment ? serializePayment(b.payment) : null,

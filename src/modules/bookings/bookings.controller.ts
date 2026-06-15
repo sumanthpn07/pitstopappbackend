@@ -21,6 +21,11 @@ export class BookingsController {
     return this.bookings.getOne(auth, id);
   }
 
+  @Get('bookings/:id/tracking')
+  tracking(@CurrentUser() auth: AuthContext, @Param('id') id: string) {
+    return this.bookings.getTracking(auth, id);
+  }
+
   @Roles(Role.CUSTOMER)
   @Post('bookings')
   create(@CurrentUser() auth: AuthContext, @Body() dto: CreateBookingDto) {

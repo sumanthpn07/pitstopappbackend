@@ -1,6 +1,12 @@
 // Response shapes returned to the mobile app. These mirror the client's
 // `src/api/contracts.ts` exactly. Enum string values match Prisma's enums.
-import type { BookingStatus, ConditionKind, PaymentStatus, Role } from '@prisma/client';
+import type {
+  BookingStatus,
+  ConditionKind,
+  PaymentStatus,
+  PickupTripStatus,
+  Role,
+} from '@prisma/client';
 
 export type WeekdayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
@@ -84,6 +90,39 @@ export interface PaymentDTO {
   status: PaymentStatus;
 }
 
+export interface PickupAddressDTO {
+  fullAddress: string;
+  landmark: string | null;
+  city: string | null;
+  lat: number;
+  lng: number;
+  contactName: string | null;
+  contactPhone: string | null;
+  notes: string | null;
+}
+
+export interface PickupTripPointDTO {
+  id: string;
+  lat: number;
+  lng: number;
+  speed: number | null;
+  heading: number | null;
+  accuracy: number | null;
+  recordedAt: string;
+}
+
+export interface PickupTripDTO {
+  id: string;
+  bookingId: string;
+  employeeMembershipId: string | null;
+  status: PickupTripStatus;
+  startedAt: string | null;
+  reachedGarageAt: string | null;
+  lastEtaMin: number | null;
+  lastLocation: PickupTripPointDTO | null;
+  path: PickupTripPointDTO[];
+}
+
 export interface BookingDTO {
   id: string;
   shopId: string;
@@ -98,6 +137,8 @@ export interface BookingDTO {
   employee: BookingPartyDTO | null;
   pickupEmployee: BookingPartyDTO | null;
   serviceEmployee: BookingPartyDTO | null;
+  pickupAddress: PickupAddressDTO | null;
+  pickupTrip: PickupTripDTO | null;
   conditionReports: ConditionReportDTO[];
   checklist: ChecklistItemDTO[];
   payment: PaymentDTO | null;

@@ -5,8 +5,8 @@ import { ApiException } from '../../common/api-exception';
 import { membershipForRole, type AuthContext, type AuthMembership } from '../../common/auth.types';
 import { checklistFor } from '../../domain/checklist-templates';
 import { isCancellable } from '../../domain/status';
-import { bookingInclude, serializeBooking, serializeReport } from '../../domain/serializers';
-import type { BookingDTO, ConditionReportDTO } from '../../domain/contracts';
+import { bookingInclude, serializeBooking, serializePickupTrip, serializeReport } from '../../domain/serializers';
+import type { BookingDTO, ConditionReportDTO, PickupTripDTO } from '../../domain/contracts';
 import type { CreateBookingDto } from './dto';
 
 @Injectable()
@@ -25,6 +25,14 @@ export class BookingsService {
     return serializeBooking(booking);
   }
 
+  private canView(auth: AuthContext, booking: { shopId: string; customerMembershipId: string }): boolean {
+    const isStaff = auth.memberships.some(
+      (m) => (m.role === Role.MANAGER || m.role === Role.EMPLOYEE) && m.shopId === booking.shopId,
+    );
+    const isOwner = auth.memberships.some((m) => m.id === booking.customerMembershipId);
+    return isStaff || isOwner;
+  }
+
   async listForCustomer(auth: AuthContext): Promise<BookingDTO[]> {
     const m = this.customerMembership(auth);
     const rows = await this.prisma.booking.findMany({
@@ -40,13 +48,22 @@ export class BookingsService {
     const booking = await this.prisma.booking.findUnique({ where: { id }, include: bookingInclude });
     if (!booking) throw ApiException.notFound('Booking not found.');
 
-    const isStaff = auth.memberships.some(
-      (m) => (m.role === Role.MANAGER || m.role === Role.EMPLOYEE) && m.shopId === booking.shopId,
-    );
-    const isOwner = auth.memberships.some((m) => m.id === booking.customerMembershipId);
-    if (!isStaff && !isOwner) throw ApiException.forbidden('You can’t view this booking.');
+    if (!this.canView(auth, booking)) throw ApiException.forbidden('You can’t view this booking.');
 
     return serializeBooking(booking);
+  }
+
+  async getTracking(auth: AuthContext, id: string): Promise<PickupTripDTO | null> {
+    const booking = await this.prisma.booking.findUnique({ where: { id } });
+    if (!booking) throw ApiException.notFound('Booking not found.');
+    if (!this.canView(auth, booking)) throw ApiException.forbidden('You can’t view this booking.');
+
+    const trip = await this.prisma.pickupTrip.findUnique({
+      where: { bookingId: id },
+      include: { points: { orderBy: { recordedAt: 'asc' } } },
+    });
+    if (!trip) return null;
+    return serializePickupTrip(trip);
   }
 
   async create(auth: AuthContext, dto: CreateBookingDto): Promise<BookingDTO> {
@@ -83,6 +100,14 @@ export class BookingsService {
         durationMin: service.durationMin,
         pricePaise: service.pricePaise,
         notes: dto.notes?.trim() || null,
+        pickupAddress: dto.pickupAddress?.fullAddress?.trim() || null,
+        pickupLandmark: dto.pickupAddress?.landmark?.trim() || null,
+        pickupCity: dto.pickupAddress?.city?.trim() || null,
+        pickupLat: dto.pickupAddress?.lat ?? null,
+        pickupLng: dto.pickupAddress?.lng ?? null,
+        pickupContactName: dto.pickupAddress?.contactName?.trim() || null,
+        pickupContactPhone: dto.pickupAddress?.contactPhone?.trim() || null,
+        pickupNotes: dto.pickupAddress?.notes?.trim() || null,
         checklist: { create: labels.map((label, position) => ({ label, position })) },
         // Payment is simulated as already captured for the demo.
         payment: {

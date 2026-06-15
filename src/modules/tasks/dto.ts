@@ -4,8 +4,13 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsLatitude,
+  IsLongitude,
+  IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { ConditionKind } from '@prisma/client';
@@ -37,4 +42,42 @@ export class SubmitConditionReportDto {
 export class ToggleChecklistDto {
   @IsBoolean()
   done!: boolean;
+}
+
+export class PickupTripLocationDto {
+  @Type(() => Number)
+  @IsNumber()
+  @IsLatitude()
+  lat!: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @IsLongitude()
+  lng!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  accuracy?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  speed?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(360)
+  heading?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(240)
+  etaMin?: number;
 }

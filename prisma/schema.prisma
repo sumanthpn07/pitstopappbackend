@@ -56,6 +56,13 @@ enum TxnType {
   expense
 }
 
+enum PickupTripStatus {
+  NOT_STARTED
+  PICKED_UP
+  IN_TRANSIT_TO_GARAGE
+  ARRIVED_GARAGE
+}
+
 model Shop {
   id          String   @id @default(cuid())
   name        String
@@ -166,6 +173,14 @@ model Booking {
   durationMin          Int
   pricePaise           Int
   notes                String?
+  pickupAddress        String?
+  pickupLandmark       String?
+  pickupCity           String?
+  pickupLat            Float?
+  pickupLng            Float?
+  pickupContactName    String?
+  pickupContactPhone   String?
+  pickupNotes          String?
   pickupMembershipId   String?
   serviceMembershipId  String?
   createdAt            DateTime      @default(now())
@@ -180,12 +195,47 @@ model Booking {
   conditionReports ConditionReport[]
   checklist        ChecklistItem[]
   payment          Payment?
+  pickupTrip       PickupTrip?
 
   @@index([shopId])
   @@index([customerMembershipId])
   @@index([pickupMembershipId])
   @@index([serviceMembershipId])
   @@index([scheduledAt])
+}
+
+model PickupTrip {
+  id                  String           @id @default(cuid())
+  bookingId           String           @unique
+  employeeMembershipId String?
+  status              PickupTripStatus @default(NOT_STARTED)
+  startedAt           DateTime?
+  reachedGarageAt     DateTime?
+  lastEtaMin          Int?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  booking  Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  points   PickupTripPoint[]
+
+  @@index([status])
+  @@index([employeeMembershipId])
+}
+
+model PickupTripPoint {
+  id         String   @id @default(cuid())
+  tripId     String
+  lat        Float
+  lng        Float
+  speed      Float?
+  heading    Float?
+  accuracy   Float?
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  trip PickupTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, recordedAt])
 }
 
 model ChecklistItem {
