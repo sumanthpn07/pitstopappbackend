@@ -29,3 +29,14 @@ export class RefreshDto {
   @MinLength(10)
   refreshToken!: string;
 }
+
+export class FirebaseLoginDto {
+  /** Firebase ID token from the app's phone-auth flow. */
+  @IsString()
+  @MinLength(10)
+  idToken!: string;
+
+  @IsOptional()
+  @IsString()
+  shopId?: string;
+}

@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { Public } from '../../common/decorators';
 import { AuthService } from './auth.service';
-import { OtpRequestDto, OtpVerifyDto, RefreshDto } from './dto';
+import { FirebaseLoginDto, OtpRequestDto, OtpVerifyDto, RefreshDto } from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -19,6 +19,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   verifyOtp(@Body() dto: OtpVerifyDto) {
     return this.auth.verifyOtp(dto);
+  }
+
+  @Public()
+  @Post('firebase')
+  @HttpCode(HttpStatus.OK)
+  loginWithFirebase(@Body() dto: FirebaseLoginDto) {
+    return this.auth.loginWithFirebase(dto);
   }
 
   @Public()
