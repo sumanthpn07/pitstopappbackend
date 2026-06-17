@@ -1,4 +1,5 @@
 import {
+  AuthProvider,
   BookingStatus,
   ConditionKind,
   PaymentStatus,
@@ -123,6 +124,11 @@ async function main(): Promise<void> {
       update: {},
       create: { id: st.membershipId, userId: st.userId, shopId: SHOP_ID, role: st.role },
     });
+    await prisma.authIdentity.upsert({
+      where: { provider_subject: { provider: AuthProvider.PHONE, subject: st.phone } },
+      update: { userId: st.userId, phoneSnapshot: st.phone },
+      create: { userId: st.userId, provider: AuthProvider.PHONE, subject: st.phone, phoneSnapshot: st.phone },
+    });
   }
 
   // Demo customer + vehicles
@@ -135,6 +141,11 @@ async function main(): Promise<void> {
     where: { id: DEMO_CUSTOMER.membershipId },
     update: {},
     create: { id: DEMO_CUSTOMER.membershipId, userId: DEMO_CUSTOMER.userId, shopId: SHOP_ID, role: Role.CUSTOMER },
+  });
+  await prisma.authIdentity.upsert({
+    where: { provider_subject: { provider: AuthProvider.PHONE, subject: DEMO_CUSTOMER.phone } },
+    update: { userId: DEMO_CUSTOMER.userId, phoneSnapshot: DEMO_CUSTOMER.phone },
+    create: { userId: DEMO_CUSTOMER.userId, provider: AuthProvider.PHONE, subject: DEMO_CUSTOMER.phone, phoneSnapshot: DEMO_CUSTOMER.phone },
   });
   await prisma.vehicle.upsert({
     where: { id: 'veh_demo_swift' },

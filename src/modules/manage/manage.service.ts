@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BookingStatus, Role, TxnType, Weekday } from '@prisma/client';
+import { AuthProvider, BookingStatus, Role, TxnType, Weekday } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ApiException } from '../../common/api-exception';
 import { membershipForRole, type AuthContext, type AuthMembership } from '../../common/auth.types';
@@ -217,7 +217,9 @@ export class ManageService {
   async createEmployee(auth: AuthContext, dto: CreateEmployeeDto): Promise<StaffMemberDTO> {
     const m = this.manager(auth);
     const phone = dto.phone.trim();
-    const existing = await this.prisma.user.findUnique({ where: { phone } });
+    const existing = await this.prisma.authIdentity.findUnique({
+      where: { provider_subject: { provider: AuthProvider.PHONE, subject: phone } },
+    });
     if (existing) throw ApiException.validation('That phone number is already in use.');
 
     const user = await this.prisma.user.create({
@@ -225,6 +227,8 @@ export class ManageService {
         phone,
         name: dto.name.trim(),
         memberships: { create: { shopId: m.shopId, role: Role.EMPLOYEE } },
+        // PHONE identity so the new employee can sign in via phone OTP.
+        identities: { create: { provider: AuthProvider.PHONE, subject: phone, phoneSnapshot: phone } },
       },
     });
     const membership = await this.prisma.membership.findFirstOrThrow({

@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Role, type User } from '@prisma/client';
+import { AuthProvider } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ApiException } from '../../common/api-exception';
 import { randomOtp, sha256 } from '../../common/hash';
-import type { OtpRequestResultDTO, TokensDTO } from '../../domain/contracts';
+import type { LinkResultDTO, OtpRequestResultDTO, TokensDTO } from '../../domain/contracts';
 import { TokensService } from './tokens.service';
 import { FirebaseService } from './firebase.service';
+import { IdentityService } from './identity.service';
 import type { FirebaseLoginDto, OtpRequestDto, OtpVerifyDto } from './dto';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly tokens: TokensService,
     private readonly firebase: FirebaseService,
+    private readonly identities: IdentityService,
   ) {}
 
   async requestOtp(dto: OtpRequestDto): Promise<OtpRequestResultDTO> {
@@ -47,7 +49,11 @@ export class AuthService {
       data: { consumedAt: new Date() },
     });
 
-    const user = await this.resolveUser(dto.phone, dto.shopId);
+    // Dev OTP path resolves through the same identity model as Firebase.
+    const user = await this.identities.resolveLogin(
+      { provider: AuthProvider.PHONE, subject: dto.phone, phone: dto.phone, email: null, name: null },
+      dto.shopId,
+    );
     return this.tokens.issueSession(user.id);
   }
 
@@ -56,35 +62,30 @@ export class AuthService {
   }
 
   /**
-   * Phone verification is done by Firebase on the client; here we verify the
-   * resulting ID token, then resolve/provision the user and mint our own
-   * session — so the rest of the API keeps using our JWT + refresh model.
+   * Phone/Google/Apple verification is done by Firebase on the client; here we
+   * verify the resulting ID token, resolve/provision the account via the
+   * identity model, and mint our own session — so the rest of the API keeps
+   * using our JWT + refresh model.
    */
   async loginWithFirebase(dto: FirebaseLoginDto): Promise<TokensDTO> {
-    const { phone } = await this.firebase.verifyPhoneToken(dto.idToken);
-    const user = await this.resolveUser(phone, dto.shopId);
+    const identity = await this.firebase.verifyToken(dto.idToken);
+    const user = await this.identities.resolveLogin(identity, dto.shopId);
     return this.tokens.issueSession(user.id);
   }
 
-  /**
-   * Staff (and any returning user) already exist, keyed by phone. A brand-new
-   * phone is provisioned as a CUSTOMER of the requested (or default) shop.
-   */
-  private async resolveUser(phone: string, shopId?: string): Promise<User> {
-    const existing = await this.prisma.user.findUnique({ where: { phone } });
-    if (existing) return existing;
+  /** Link the identity behind a Firebase token to the signed-in account. Reports a
+   *  merge confirmation instead of merging unless `confirmMerge` is set. */
+  async linkFirebase(
+    currentUserId: string,
+    idToken: string,
+    confirmMerge = false,
+  ): Promise<LinkResultDTO> {
+    const identity = await this.firebase.verifyToken(idToken);
+    return this.identities.linkIdentity(currentUserId, identity, confirmMerge);
+  }
 
-    const targetShopId = shopId ?? this.config.getOrThrow<string>('defaultShopId');
-    const shop =
-      (await this.prisma.shop.findUnique({ where: { id: targetShopId } })) ??
-      (await this.prisma.shop.findFirst());
-    if (!shop) throw ApiException.validation('No shop is configured.');
-
-    return this.prisma.user.create({
-      data: {
-        phone,
-        memberships: { create: { shopId: shop.id, role: Role.CUSTOMER } },
-      },
-    });
+  /** Remove a login method from the signed-in account. */
+  async unlinkProvider(currentUserId: string, provider: AuthProvider): Promise<void> {
+    await this.identities.unlinkIdentity(currentUserId, provider);
   }
 }

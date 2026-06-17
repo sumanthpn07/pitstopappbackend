@@ -1,4 +1,5 @@
-import { IsOptional, IsString, Length, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, Length, MinLength } from 'class-validator';
+import { AuthProvider } from '@prisma/client';
 
 export class OtpRequestDto {
   @IsString()
@@ -39,4 +40,21 @@ export class FirebaseLoginDto {
   @IsOptional()
   @IsString()
   shopId?: string;
+}
+
+export class LinkFirebaseDto {
+  /** Firebase ID token for the provider being linked to the current account. */
+  @IsString()
+  @MinLength(10)
+  idToken!: string;
+
+  /** Set true to actually perform the merge after the user confirms. */
+  @IsOptional()
+  @IsBoolean()
+  confirmMerge?: boolean;
+}
+
+export class UnlinkDto {
+  @IsEnum(AuthProvider)
+  provider!: AuthProvider;
 }
