@@ -15,7 +15,7 @@ export class MeController {
   async me(@CurrentUser() auth: AuthContext): Promise<MeDTO> {
     const user = await this.prisma.user.findUnique({
       where: { id: auth.userId },
-      include: { memberships: { include: { shop: true } } },
+      include: { memberships: { include: { shop: true } }, identities: true },
     });
     if (!user) throw ApiException.unauthorized();
     return serializeMe(user);
@@ -29,7 +29,7 @@ export class MeController {
         ...(dto.name !== undefined ? { name: dto.name.trim() || null } : {}),
         ...(dto.email !== undefined ? { email: dto.email.trim() || null } : {}),
       },
-      include: { memberships: { include: { shop: true } } },
+      include: { memberships: { include: { shop: true } }, identities: true },
     });
     return serializeMe(user);
   }

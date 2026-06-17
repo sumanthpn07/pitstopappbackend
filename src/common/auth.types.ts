@@ -11,7 +11,7 @@ export interface AuthMembership {
 /** Resolved identity attached to the request by the JWT guard. */
 export interface AuthContext {
   userId: string;
-  phone: string;
+  phone: string | null;
   name: string | null;
   memberships: AuthMembership[];
 }

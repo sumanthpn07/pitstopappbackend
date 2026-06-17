@@ -57,7 +57,7 @@ type MembershipWithUser = Prisma.MembershipGetPayload<{ include: { user: true } 
 type ReportWithPhotos = Prisma.ConditionReportGetPayload<{ include: { photos: true } }>;
 type TripWithPoints = Prisma.PickupTripGetPayload<{ include: { points: true } }>;
 type UserWithMemberships = Prisma.UserGetPayload<{
-  include: { memberships: { include: { shop: true } } };
+  include: { memberships: { include: { shop: true } }; identities: true };
 }>;
 
 function partyOf(m: MembershipWithUser | null): BookingPartyDTO | null {
@@ -235,7 +235,7 @@ export function serializeMe(user: UserWithMemberships): MeDTO {
   return {
     user: {
       id: user.id,
-      phone: user.phone,
+      phone: user.phone ?? '',
       name: user.name ?? null,
       email: user.email ?? null,
     },
@@ -247,6 +247,11 @@ export function serializeMe(user: UserWithMemberships): MeDTO {
         shopName: m.shop.name,
       }),
     ),
+    loginMethods: user.identities.map((i) => ({
+      provider: i.provider,
+      email: i.emailSnapshot,
+      phone: i.phoneSnapshot,
+    })),
   };
 }
 
@@ -255,7 +260,7 @@ export function serializeStaff(m: MembershipWithUser, activeTasks: number): Staf
     membershipId: m.id,
     userId: m.userId,
     name: m.user.name ?? '',
-    phone: m.user.phone,
+    phone: m.user.phone ?? '',
     role: m.role,
     activeTasks,
   };

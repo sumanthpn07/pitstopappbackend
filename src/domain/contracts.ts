@@ -173,10 +173,23 @@ export interface UserDTO {
   email: string | null;
 }
 
+export interface LoginMethodDTO {
+  provider: 'PHONE' | 'GOOGLE' | 'APPLE';
+  email: string | null;
+  phone: string | null;
+}
+
 export interface MeDTO {
   user: UserDTO;
   memberships: MembershipDTO[];
+  loginMethods: LoginMethodDTO[];
 }
+
+/** Outcome of POST /auth/link. `merge_required` is returned (without merging) when
+ *  the identity already belongs to another account — the client confirms first. */
+export type LinkResultDTO =
+  | { status: 'linked' | 'already_linked' | 'merged' }
+  | { status: 'merge_required'; conflict: { bookings: number; vehicles: number } };
 
 export interface TokensDTO {
   accessToken: string;

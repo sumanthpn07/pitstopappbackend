@@ -17,6 +17,12 @@ enum Role {
   CUSTOMER
 }
 
+enum AuthProvider {
+  PHONE
+  GOOGLE
+  APPLE
+}
+
 enum BookingStatus {
   BOOKED
   ASSIGNED
@@ -100,13 +106,33 @@ model WorkingHour {
 
 model User {
   id        String   @id @default(cuid())
-  phone     String   @unique
+  // Contact info now, not the auth key. A Google-only user may have no phone.
+  phone     String?
   name      String?
   email     String?
   createdAt DateTime @default(now())
 
   memberships   Membership[]
   refreshTokens RefreshToken[]
+  identities    AuthIdentity[]
+}
+
+/// One login method per row. Many identities can point at the same User, which
+/// is how account linking/merging works without duplicating accounts.
+model AuthIdentity {
+  id            String       @id @default(cuid())
+  userId        String
+  provider      AuthProvider
+  // Stable per-provider key: E.164 phone for PHONE, Google `sub` for GOOGLE.
+  subject       String
+  emailSnapshot String?
+  phoneSnapshot String?
+  createdAt     DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@index([userId])
 }
 
 model Membership {

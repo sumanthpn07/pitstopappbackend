@@ -3,10 +3,11 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { TokensService } from './tokens.service';
 import { FirebaseService } from './firebase.service';
+import { IdentityService } from './identity.service';
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService, TokensService, FirebaseService],
+  providers: [AuthService, TokensService, FirebaseService, IdentityService],
   exports: [TokensService],
 })
 export class AuthModule {}
