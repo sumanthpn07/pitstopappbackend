@@ -30,7 +30,7 @@ export class JwtAuthGuard implements CanActivate {
     }
     const token = header.slice('Bearer '.length).trim();
 
-    let payload: { sub?: string; type?: string };
+    let payload: { sub?: string; type?: string; tenantMemberships?: Array<{ tenantId: string; role: string }> };
     try {
       payload = await this.jwt.verifyAsync(token, {
         secret: this.config.getOrThrow<string>('jwt.secret'),
@@ -44,7 +44,10 @@ export class JwtAuthGuard implements CanActivate {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { memberships: { include: { shop: true } } },
+      include: {
+        memberships: { include: { shop: true } },
+        tenantMemberships: { include: { tenant: true } },
+      },
     });
     if (!user) throw ApiException.unauthorized();
 
@@ -57,6 +60,12 @@ export class JwtAuthGuard implements CanActivate {
         shopId: m.shopId,
         role: m.role,
         shopName: m.shop.name,
+      })),
+      tenantMemberships: user.tenantMemberships.map((tm) => ({
+        id: tm.id,
+        tenantId: tm.tenantId,
+        role: tm.role,
+        tenantName: tm.tenant.name,
       })),
     };
     req.auth = auth;

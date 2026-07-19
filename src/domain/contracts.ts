@@ -202,6 +202,30 @@ export interface OtpRequestResultDTO {
   devCode?: string;
 }
 
+/** A single tenant context entry returned from GET /auth/context */
+export interface AuthContextTenantDTO {
+  tenantId: string;
+  tenantName: string;
+  role: Role;
+}
+
+/** Response from GET /auth/context — lists the user's available tenant contexts */
+export interface AuthContextDTO {
+  userId: string;
+  name: string | null;
+  /** Legacy shop-based memberships */
+  memberships: MembershipDTO[];
+  /** New tenant memberships */
+  tenantMemberships: AuthContextTenantDTO[];
+}
+
+/** Response from POST /auth/switch-tenant */
+export interface SwitchTenantResultDTO {
+  tenantId: string;
+  tenantName: string;
+  role: Role;
+}
+
 export interface OfferDTO {
   id: string;
   title: string;

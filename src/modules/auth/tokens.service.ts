@@ -20,8 +20,21 @@ export class TokensService {
     const accessTtl = this.config.getOrThrow<number>('jwt.accessTtl');
     const refreshDays = this.config.getOrThrow<number>('jwt.refreshTtlDays');
 
+    // Fetch tenant memberships to embed in the token
+    const tenantMemberships = await this.prisma.tenantMembership.findMany({
+      where: { userId },
+      select: { tenantId: true, role: true },
+    });
+
     const accessToken = await this.jwt.signAsync(
-      { sub: userId, type: 'access' },
+      {
+        sub: userId,
+        type: 'access',
+        tenantMemberships: tenantMemberships.map((tm) => ({
+          tenantId: tm.tenantId,
+          role: tm.role,
+        })),
+      },
       { secret, expiresIn: accessTtl },
     );
 

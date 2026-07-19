@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { CurrentUser, Public } from '../../common/decorators';
 import type { AuthContext } from '../../common/auth.types';
 import { AuthService } from './auth.service';
@@ -8,6 +8,7 @@ import {
   OtpRequestDto,
   OtpVerifyDto,
   RefreshDto,
+  SwitchTenantDto,
   UnlinkDto,
 } from './dto';
 
@@ -56,5 +57,28 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async unlink(@CurrentUser() auth: AuthContext, @Body() dto: UnlinkDto): Promise<void> {
     await this.auth.unlinkProvider(auth.userId, dto.provider);
+  }
+
+  /**
+   * Returns the user's available tenants/roles for context selection.
+   * The frontend calls this after login to know which context to operate in.
+   * If the user has exactly one tenant membership, the frontend can auto-select.
+   * If more than one, it presents a context selector.
+   */
+  @Get('context')
+  @HttpCode(HttpStatus.OK)
+  getContext(@CurrentUser() auth: AuthContext) {
+    return this.auth.getContext(auth.userId);
+  }
+
+  /**
+   * Validates that the user has a membership in the target tenant and returns
+   * context details. The actual runtime switching happens via the x-tenant-id
+   * header; this endpoint is for validation and obtaining tenant metadata.
+   */
+  @Post('switch-tenant')
+  @HttpCode(HttpStatus.OK)
+  switchTenant(@CurrentUser() auth: AuthContext, @Body() dto: SwitchTenantDto) {
+    return this.auth.switchTenant(auth.userId, dto.tenantId);
   }
 }

@@ -58,3 +58,10 @@ export class UnlinkDto {
   @IsEnum(AuthProvider)
   provider!: AuthProvider;
 }
+
+export class SwitchTenantDto {
+  /** The tenant ID to switch the active context to. */
+  @IsString()
+  @MinLength(1)
+  tenantId!: string;
+}

@@ -4,7 +4,7 @@ import { AuthProvider } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ApiException } from '../../common/api-exception';
 import { randomOtp, sha256 } from '../../common/hash';
-import type { LinkResultDTO, OtpRequestResultDTO, TokensDTO } from '../../domain/contracts';
+import type { AuthContextDTO, LinkResultDTO, OtpRequestResultDTO, SwitchTenantResultDTO, TokensDTO } from '../../domain/contracts';
 import { TokensService } from './tokens.service';
 import { FirebaseService } from './firebase.service';
 import { IdentityService } from './identity.service';
@@ -87,5 +87,72 @@ export class AuthService {
   /** Remove a login method from the signed-in account. */
   async unlinkProvider(currentUserId: string, provider: AuthProvider): Promise<void> {
     await this.identities.unlinkIdentity(currentUserId, provider);
+  }
+
+  /**
+   * Returns the user's available tenant contexts and roles.
+   * Called after login so the frontend knows which context to operate in.
+   */
+  async getContext(userId: string): Promise<AuthContextDTO> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        memberships: { include: { shop: true } },
+        tenantMemberships: { include: { tenant: true } },
+      },
+    });
+    if (!user) throw ApiException.unauthorized();
+
+    return {
+      userId: user.id,
+      name: user.name,
+      memberships: user.memberships.map((m) => ({
+        id: m.id,
+        shopId: m.shopId,
+        role: m.role,
+        shopName: m.shop.name,
+      })),
+      tenantMemberships: user.tenantMemberships.map((tm) => ({
+        tenantId: tm.tenantId,
+        tenantName: tm.tenant.name,
+        role: tm.role,
+      })),
+    };
+  }
+
+  /**
+   * Validates that the user holds a membership in the target tenant
+   * and returns the tenant context details. The frontend uses the
+   * x-tenant-id header approach for runtime switching; this endpoint
+   * provides validation and context metadata.
+   */
+  async switchTenant(userId: string, tenantId: string): Promise<SwitchTenantResultDTO> {
+    // Check legacy memberships first
+    const legacyMembership = await this.prisma.membership.findFirst({
+      where: { userId, shopId: tenantId },
+      include: { shop: true },
+    });
+    if (legacyMembership) {
+      return {
+        tenantId: legacyMembership.shopId,
+        tenantName: legacyMembership.shop.name,
+        role: legacyMembership.role,
+      };
+    }
+
+    // Check tenant memberships
+    const tenantMembership = await this.prisma.tenantMembership.findFirst({
+      where: { userId, tenantId },
+      include: { tenant: true },
+    });
+    if (tenantMembership) {
+      return {
+        tenantId: tenantMembership.tenantId,
+        tenantName: tenantMembership.tenant.name,
+        role: tenantMembership.role,
+      };
+    }
+
+    throw ApiException.forbidden('You do not have membership in this organization.');
   }
 }

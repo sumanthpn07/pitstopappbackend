@@ -112,9 +112,12 @@ model User {
   email     String?
   createdAt DateTime @default(now())
 
-  memberships   Membership[]
-  refreshTokens RefreshToken[]
-  identities    AuthIdentity[]
+  memberships       Membership[]
+  refreshTokens     RefreshToken[]
+  identities        AuthIdentity[]
+  tenantMemberships TenantMembership[]
+  ownershipRecords  OwnershipRecord[]
+  fleets            Fleet[]
 }
 
 /// One login method per row. Many identities can point at the same User, which
@@ -364,4 +367,661 @@ model FinanceTxn {
   shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
   @@index([shopId])
+}
+
+// ─── New Enums (Vehicle Lifecycle Platform) ────────────────────
+
+enum JobCardStatus {
+  CREATED
+  ASSIGNED
+  IN_PROGRESS
+  QUALITY_CHECK
+  COMPLETED
+  INVOICED
+  CANCELLED
+}
+
+enum TransferType {
+  SALE
+  GIFT
+  FLEET_REASSIGNMENT
+  FLEET_ASSIGNMENT
+  LEGACY_MIGRATION
+}
+
+enum TransferStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  DECLINED
+}
+
+enum ServiceCategory {
+  ROUTINE_MAINTENANCE
+  REPAIR
+  ACCIDENT_REPAIR
+  INSPECTION
+  MODIFICATION
+}
+
+enum ServiceEventSource {
+  JOB_CARD
+  OWNER_REPORTED
+  MIGRATION
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+  BANK_TRANSFER
+}
+
+enum InventoryMovementType {
+  PURCHASE
+  CONSUMPTION
+  RETURN
+  ADJUSTMENT
+}
+
+enum MaintenanceUrgency {
+  OVERDUE
+  DUE_SOON
+  UPCOMING
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  PERMANENTLY_FAILED
+}
+
+enum DocumentType {
+  INSURANCE
+  REGISTRATION
+  POLLUTION_CERTIFICATE
+  WARRANTY
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  CNG
+  ELECTRIC
+  HYBRID
+}
+
+enum TransmissionType {
+  MANUAL
+  AUTOMATIC
+  CVT
+}
+
+// ─── Tenant (evolves from Shop) ────────────────────────────────
+
+model Tenant {
+  id              String   @id @default(cuid())
+  name            String
+  tagline         String?
+  logoUrl         String?
+  address         String?
+  lat             Float?
+  lng             Float?
+  timezone        String   @default("Asia/Kolkata")
+  gstRate         Float    @default(0)
+  gstin           String?
+  contactPhone    String?
+  slotDurationMin Int      @default(30)
+  slotCapacity    Int      @default(1)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  // Legacy link: Shop.id = Tenant.id after migration
+  legacyShopId String? @unique
+
+  workingHours         TenantWorkingHour[]
+  tenantMemberships    TenantMembership[]
+  serviceCatalog       TenantService[]
+  jobCards             JobCard[]
+  inventoryItems       InventoryItem[]
+  invoices             Invoice[]
+  maintenanceTemplates MaintenanceTemplate[]
+  notifications        Notification[]
+  financeTxns          TenantFinanceTxn[]
+}
+
+model TenantWorkingHour {
+  id       String  @id @default(cuid())
+  tenantId String
+  day      Weekday
+  open     String
+  close    String
+  capacity Int
+  closed   Boolean @default(false)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, day])
+}
+
+model TenantMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      Role
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId, role])
+  @@index([tenantId, role])
+}
+
+model TenantService {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  pricePaise  Int
+  durationMin Int
+  photoUrl    String?
+  active      Boolean  @default(true)
+  icon        String?
+  category    String?
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  jobItems JobCardItem[]
+
+  @@index([tenantId])
+}
+
+// ─── Global Vehicle Identity ───────────────────────────────────
+
+model VehicleRecord {
+  id                String           @id @default(cuid())
+  vin               String?          @unique
+  chassisNumber     String?          @unique
+  registrationPlate String?
+  make              String
+  model             String
+  year              Int
+  color             String?
+  fuelType          FuelType?
+  engineCapacityCc  Int?
+  transmission      TransmissionType?
+  photoUrl          String?
+  latestOdometerKm  Int?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  ownershipRecords    OwnershipRecord[]
+  serviceEvents       ServiceEvent[]
+  healthScore         HealthScore?
+  maintenanceSchedule MaintenanceScheduleEntry[]
+  documents           VehicleDocument[]
+  jobCards            JobCard[]
+  auditTrail          VehicleAuditEntry[]
+  fleetAssignment     FleetVehicle?
+
+  // Legacy link
+  legacyVehicleId String?
+
+  @@index([registrationPlate])
+}
+
+model VehicleAuditEntry {
+  id              String   @id @default(cuid())
+  vehicleRecordId String
+  userId          String
+  fieldChanged    String
+  previousValue   String?
+  newValue        String?
+  timestamp       DateTime @default(now())
+
+  vehicleRecord VehicleRecord @relation(fields: [vehicleRecordId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleRecordId, timestamp])
+}
+
+// ─── Ownership ─────────────────────────────────────────────────
+
+model OwnershipRecord {
+  id              String         @id @default(cuid())
+  vehicleRecordId String
+  userId          String?
+  anonymizedId    String?
+  transferType    TransferType
+  transferStatus  TransferStatus @default(CONFIRMED)
+  odometerKm      Int?
+  startDate       DateTime
+  endDate         DateTime?
+  initiatedById   String?
+  confirmedAt     DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime       @default(now())
+
+  vehicleRecord VehicleRecord @relation(fields: [vehicleRecordId], references: [id], onDelete: Cascade)
+  user          User?         @relation(fields: [userId], references: [id])
+
+  @@index([vehicleRecordId, startDate])
+  @@index([userId])
+}
+
+// ─── Service History ───────────────────────────────────────────
+
+model ServiceEvent {
+  id              String             @id @default(cuid())
+  vehicleRecordId String
+  tenantId        String?
+  tenantName      String
+  serviceType     String
+  category        ServiceCategory
+  description     String?
+  partsUsed       Json?              // [{name, quantity}]
+  laborCostPaise  Int?
+  partsCostPaise  Int?
+  totalCostPaise  Int
+  currency        String             @default("INR")
+  odometerKm      Int?
+  technicianName  String?
+  source          ServiceEventSource
+  jobCardId       String?
+  completedAt     DateTime
+  createdAt       DateTime           @default(now())
+
+  vehicleRecord VehicleRecord @relation(fields: [vehicleRecordId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleRecordId, completedAt])
+  @@index([tenantId])
+}
+
+// ─── Health Score ──────────────────────────────────────────────
+
+model HealthScore {
+  id                    String   @id @default(cuid())
+  vehicleRecordId       String   @unique
+  score                 Int      // 0-100
+  maintenanceCompliance Int      // sub-score
+  timeSinceService      Int      // sub-score
+  vehicleAge            Int      // sub-score
+  serviceCount          Int      // sub-score
+  unresolvedIssues      Int      // sub-score
+  calculatedAt          DateTime
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  vehicleRecord VehicleRecord @relation(fields: [vehicleRecordId], references: [id], onDelete: Cascade)
+}
+
+// ─── Job Cards ─────────────────────────────────────────────────
+
+model JobCard {
+  id                  String        @id @default(cuid())
+  tenantId            String
+  vehicleRecordId     String
+  customerId          String
+  status              JobCardStatus @default(CREATED)
+  assignedTechId      String?
+  estimatedCompletion DateTime?
+  scheduledAt         DateTime?
+  reworkCount         Int           @default(0)
+  reworkReason        String?
+  cancellationReason  String?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicleRecord VehicleRecord @relation(fields: [vehicleRecordId], references: [id])
+  items         JobCardItem[]
+  partsConsumed JobCardPart[]
+  laborNotes    JobCardNote[]
+  invoice       Invoice?
+  photos        JobCardPhoto[]
+
+  @@index([tenantId, status])
+  @@index([vehicleRecordId])
+  @@index([customerId])
+  @@index([scheduledAt])
+}
+
+model JobCardItem {
+  id          String @id @default(cuid())
+  jobCardId   String
+  serviceId   String
+  pricePaise  Int
+  durationMin Int
+
+  jobCard JobCard       @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  service TenantService @relation(fields: [serviceId], references: [id])
+
+  @@index([jobCardId])
+}
+
+model JobCardPart {
+  id              String  @id @default(cuid())
+  jobCardId       String
+  inventoryItemId String
+  quantity        Int
+  unitCostPaise   Int
+  reversed        Boolean @default(false)
+  reversalReason  String?
+
+  jobCard       JobCard       @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([jobCardId])
+}
+
+model JobCardNote {
+  id        String   @id @default(cuid())
+  jobCardId String
+  authorId  String
+  content   String   // max 2000 chars
+  createdAt DateTime @default(now())
+
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
+  @@index([jobCardId])
+}
+
+model JobCardPhoto {
+  id        String   @id @default(cuid())
+  jobCardId String
+  url       String
+  caption   String?
+  kind      String   // "before" | "after"
+  createdAt DateTime @default(now())
+
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
+  @@index([jobCardId])
+}
+
+// ─── Inventory ─────────────────────────────────────────────────
+
+model InventoryItem {
+  id                String   @id @default(cuid())
+  tenantId          String
+  name              String
+  sku               String
+  category          String?
+  quantity          Int      @default(0)
+  unitCostPaise     Int
+  sellingPricePaise Int
+  reorderThreshold  Int      @default(0)
+  preferredVendor   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  movements InventoryMovement[]
+  jobParts  JobCardPart[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+}
+
+model InventoryMovement {
+  id              String                @id @default(cuid())
+  inventoryItemId String
+  type            InventoryMovementType
+  quantityDelta   Int
+  referenceId     String?               // JobCard ID or PO number
+  staffId         String
+  notes           String?
+  createdAt       DateTime              @default(now())
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryItemId, createdAt])
+}
+
+// ─── Invoicing ─────────────────────────────────────────────────
+
+model Invoice {
+  id             String        @id @default(cuid())
+  tenantId       String
+  jobCardId      String        @unique
+  invoiceNumber  String        // Sequential per tenant per financial year
+  customerId     String
+  customerName   String
+  customerPhone  String?
+  vehicleSummary String        // "Make Model Year - Plate"
+  subtotalPaise  Int
+  taxPaise       Int
+  totalPaise     Int
+  status         InvoiceStatus @default(ISSUED)
+  issuedAt       DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  jobCard   JobCard           @relation(fields: [jobCardId], references: [id])
+  lineItems InvoiceLineItem[]
+  payments  InvoicePayment[]
+
+  @@index([tenantId, issuedAt])
+  @@index([customerId])
+}
+
+model InvoiceLineItem {
+  id          String @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int    @default(1)
+  unitPaise   Int
+  totalPaise  Int
+  type        String // "service" | "part"
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model InvoicePayment {
+  id          String        @id @default(cuid())
+  invoiceId   String
+  amountPaise Int
+  method      PaymentMethod
+  reference   String?
+  paidAt      DateTime      @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+// ─── Maintenance Scheduling ────────────────────────────────────
+
+model MaintenanceTemplate {
+  id       String @id @default(cuid())
+  tenantId String
+  make     String
+  model    String
+  items    Json   // [{serviceType, intervalKm, intervalMonths}] max 50
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, make, model])
+}
+
+model MaintenanceScheduleEntry {
+  id                 String             @id @default(cuid())
+  vehicleRecordId    String
+  serviceType        String
+  dueDate            DateTime?
+  dueOdometerKm      Int?
+  estimatedCostPaise Int?
+  urgency            MaintenanceUrgency @default(UPCOMING)
+  completed          Boolean            @default(false)
+  completedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  vehicleRecord VehicleRecord @relation(fields: [vehicleRecordId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleRecordId, completed])
+}
+
+// ─── Fleet ─────────────────────────────────────────────────────
+
+model Fleet {
+  id                    String   @id @default(cuid())
+  ownerId               String
+  name                  String
+  organizationName      String
+  organizationRegNumber String?
+  createdAt             DateTime @default(now())
+
+  owner    User           @relation(fields: [ownerId], references: [id])
+  vehicles FleetVehicle[]
+  drivers  FleetDriver[]
+
+  @@index([ownerId])
+}
+
+model FleetVehicle {
+  id               String    @id @default(cuid())
+  fleetId          String
+  vehicleRecordId  String    @unique
+  assignedDriverId String?
+  addedAt          DateTime  @default(now())
+  removedAt        DateTime?
+
+  fleet         Fleet         @relation(fields: [fleetId], references: [id], onDelete: Cascade)
+  vehicleRecord VehicleRecord @relation(fields: [vehicleRecordId], references: [id])
+
+  @@index([fleetId])
+}
+
+model FleetDriver {
+  id           String @id @default(cuid())
+  fleetId      String
+  name         String
+  contactPhone String
+
+  fleet Fleet @relation(fields: [fleetId], references: [id], onDelete: Cascade)
+
+  @@index([fleetId])
+}
+
+// ─── Notifications ─────────────────────────────────────────────
+
+model Notification {
+  id          String              @id @default(cuid())
+  tenantId    String?
+  userId      String
+  channel     NotificationChannel
+  eventType   String
+  title       String
+  body        String
+  status      NotificationStatus  @default(PENDING)
+  retryCount  Int                 @default(0)
+  lastRetryAt DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime            @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model NotificationPreference {
+  id        String              @id @default(cuid())
+  userId    String
+  eventType String
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+
+  @@unique([userId, eventType, channel])
+}
+
+// ─── Documents ─────────────────────────────────────────────────
+
+model VehicleDocument {
+  id              String       @id @default(cuid())
+  vehicleRecordId String
+  documentType    DocumentType
+  issuer          String?
+  issueDate       DateTime
+  expiryDate      DateTime?
+  fileUrl         String
+  fileSizeBytes   Int
+  mimeType        String
+  createdAt       DateTime     @default(now())
+
+  vehicleRecord VehicleRecord @relation(fields: [vehicleRecordId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleRecordId])
+  @@index([expiryDate])
+}
+
+// ─── Event Bus (Outbox Pattern) ────────────────────────────────
+
+model OutboxEvent {
+  id            String    @id @default(cuid())
+  eventType     String
+  payload       Json
+  payloadHash   String
+  sourceEntity  String
+  sourceId      String
+  published     Boolean   @default(false)
+  publishedAt   DateTime?
+  retryCount    Int       @default(0)
+  deadLettered  Boolean   @default(false)
+  failureReason String?
+  createdAt     DateTime  @default(now())
+
+  @@index([published, createdAt])
+  @@index([deadLettered])
+}
+
+model EventConsumerLog {
+  id          String   @id @default(cuid())
+  eventId     String
+  consumer    String
+  success     Boolean
+  processedAt DateTime @default(now())
+  error       String?
+
+  @@unique([eventId, consumer])
+  @@index([eventId])
+}
+
+// ─── Finance (Tenant-scoped, evolves from FinanceTxn) ──────────
+
+model TenantFinanceTxn {
+  id          String   @id @default(cuid())
+  tenantId    String
+  type        TxnType
+  category    String
+  note        String?
+  amountPaise Int
+  invoiceId   String?
+  jobCardId   String?
+  date        DateTime
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, date])
 }
